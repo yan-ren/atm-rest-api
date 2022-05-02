@@ -1,0 +1,35 @@
+version: "3"
+services:
+  app:
+    build: .
+    ports:
+      - 8080:8080
+    restart: on-failure
+    volumes:
+      - api:/usr/src/app/
+    depends_on:
+      db-postgres:
+        condition: service_healthy
+    networks:
+      - fullstack
+  db-postgres:
+    environment:
+      POSTGRES_PASSWORD: admin123
+    image: "postgres:11"
+    ports:
+      - "5432:5432"
+    volumes:
+      - my_dbdata:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d/
+    networks:
+      - fullstack
+    healthcheck:
+      test: "exit 0"
+volumes:
+  my_dbdata:
+  api:
+
+
+networks:
+  fullstack:
+    driver: bridge
