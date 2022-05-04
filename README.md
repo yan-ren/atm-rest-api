@@ -113,5 +113,5 @@ http://localhost:8080/ping
 
 To run integration test
 ```
-make test -k
+make test
 ```

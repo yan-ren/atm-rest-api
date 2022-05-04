@@ -7,4 +7,4 @@ down:
 test:
 	docker-compose -f docker-compose.yml up -d --build
 	-go test ./... -v
-	# docker-compose -f docker-compose.yml down --volumes
+	docker-compose -f docker-compose.yml down --volumes
