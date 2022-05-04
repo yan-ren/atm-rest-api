@@ -57,9 +57,10 @@ This endpoint requires a valid `x-authentication-token` header to be passed in w
 
 The payload should have the following fields:
 
+Example 1
 ```json
 {
-  "type": "withdraw/deposit",
+  "type": "withdraw",
   "amount": 5
 }
 ```
@@ -74,7 +75,24 @@ The response body should look like:
   }
 }
 ```
+Example 2
+```json
+{
+  "type": "deposit",
+  "amount": 5
+}
+```
 
+The response body should look like:
+```json
+{
+  "account": 
+  {
+    "id": 1,
+    "balance": 100
+  }
+}
+```
 ## Design Spec
 
 To determine whether a request is from a logged in user or not, I use Json Web Tokens (https://jwt.io/). The frontend will be sending requests with the JWT in the x-authentication-token header.
@@ -92,12 +110,6 @@ make up
 ```
 Test API is accessible through end point
 http://localhost:8080/ping
-
-Other end points are:
-- POST http://locahost:8080/singup
-- POST http://locahost:8080/login
-- GET http://locahost:8080/users
-- PUT http://locahost:8080/users
 
 To run integration test
 ```

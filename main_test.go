@@ -8,74 +8,35 @@ import (
 	"testing"
 
 	"github.com/labstack/echo"
+	"gotest.tools/assert"
+	is "gotest.tools/assert/cmp"
 )
 
-const Login = "http://localhost:8080/login"
-const Signup = "http://localhost:8080/signup"
-const Users = "http://localhost:8080/users"
+const LoginEndpoint = "http://localhost:8080/login"
 const Authorization = "x-authentication-token"
 
 type TokenResponse struct {
 	Token string `json:"token"`
 }
 
+type GetAccountResponse struct {
+	Accounts []int `json:"accounts"`
+}
+
+type GetAccountByIdResponse struct {
+	Account Account `json:"account"`
+}
+
 func TestMain(t *testing.T) {
-	// test POST /signup
-	reqStr := `{
-		"email": "test@axiomzen.co",
-		"password": "axiomzen",
-		"firstName": "Alex",
-		"lastName": "Zimmerman"
-	  }`
-	req, err := http.NewRequest(echo.POST, Signup, strings.NewReader(reqStr))
-	if err != nil {
-		t.Logf(err.Error())
-		t.Fail()
-	}
-
-	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-
 	client := http.Client{}
-	response, err := client.Do(req)
-	assertNoError(t, err)
-	assertEqual(t, http.StatusCreated, response.StatusCode)
-
-	byteBody, err := ioutil.ReadAll(response.Body)
-	assertNoError(t, err)
-
 	var token TokenResponse
-	if error := json.Unmarshal(byteBody, &token); err != nil {
-		panic(error)
-	}
-	if token.Token == "" {
-		t.Logf("Empty token")
-		t.Fail()
-	}
-
-	// test GET /users
-	req, err = http.NewRequest(echo.GET, Users, strings.NewReader(""))
-	if err != nil {
-		t.Logf(err.Error())
-		t.Fail()
-	}
-
-	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-	req.Header.Set(Authorization, token.Token)
-
-	response, err = client.Do(req)
-	assertNoError(t, err)
-	assertEqual(t, http.StatusOK, response.StatusCode)
-
-	byteBody, err = ioutil.ReadAll(response.Body)
-	assertNoError(t, err)
-	assertEqual(t, `{"users":[{"email":"test@axiomzen.co","firstName":"Alex","lastName":"Zimmerman"}]}`, strings.Trim(string(byteBody), "\n"))
 
 	// test POST /login
-	reqStr = `{
+	reqStr := `{
 		"email": "test@axiomzen.co",
-		"password": "axiomzen"
+		"password": "1234"
 	  }`
-	req, err = http.NewRequest(echo.POST, Login, strings.NewReader(reqStr))
+	req, err := http.NewRequest(echo.POST, LoginEndpoint, strings.NewReader(reqStr))
 	if err != nil {
 		t.Logf(err.Error())
 		t.Fail()
@@ -83,12 +44,12 @@ func TestMain(t *testing.T) {
 
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
-	response, err = client.Do(req)
-	assertNoError(t, err)
-	assertEqual(t, http.StatusCreated, response.StatusCode)
+	response, err := client.Do(req)
+	assert.NilError(t, err)
+	assert.Equal(t, http.StatusCreated, response.StatusCode)
 
-	byteBody, err = ioutil.ReadAll(response.Body)
-	assertNoError(t, err)
+	byteBody, err := ioutil.ReadAll(response.Body)
+	assert.NilError(t, err)
 
 	if error := json.Unmarshal(byteBody, &token); err != nil {
 		panic(error)
@@ -98,12 +59,60 @@ func TestMain(t *testing.T) {
 		t.Fail()
 	}
 
-	// test PUT /users
+	// test GET /account
+	req, err = http.NewRequest(echo.GET, "http://localhost:8080/account", strings.NewReader(""))
+	if err != nil {
+		t.Logf(err.Error())
+		t.Fail()
+	}
+
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set(Authorization, token.Token)
+
+	response, err = client.Do(req)
+	assert.NilError(t, err)
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+
+	byteBody, err = ioutil.ReadAll(response.Body)
+	assert.NilError(t, err)
+
+	var getAccountResponse GetAccountResponse
+	if error := json.Unmarshal(byteBody, &getAccountResponse); err != nil {
+		panic(error)
+	}
+	assert.Assert(t, is.Len(getAccountResponse.Accounts, 2))
+	assert.Assert(t, is.Contains(getAccountResponse.Accounts, 1))
+	assert.Assert(t, is.Contains(getAccountResponse.Accounts, 2))
+
+	// test GET /account/1
+	req, err = http.NewRequest(echo.GET, "http://localhost:8080/account/1", strings.NewReader(""))
+	if err != nil {
+		t.Logf(err.Error())
+		t.Fail()
+	}
+
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set(Authorization, token.Token)
+
+	response, err = client.Do(req)
+	assert.NilError(t, err)
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+
+	byteBody, err = ioutil.ReadAll(response.Body)
+	assert.NilError(t, err)
+
+	var getAccountByIdResponse GetAccountByIdResponse
+	if error := json.Unmarshal(byteBody, &getAccountByIdResponse); err != nil {
+		panic(error)
+	}
+	assert.DeepEqual(t, getAccountByIdResponse.Account, Account{Id: 1, Balance: 100})
+
+	// test withdraw
 	reqStr = `{
-		"firstName": "NewFirstName",
-		"lastName": "NewLastName"
-	  }`
-	req, err = http.NewRequest(echo.PUT, Users, strings.NewReader(reqStr))
+		"type": "withdraw",
+		"amount": 5
+	}`
+	req, err = http.NewRequest(echo.POST, "http://localhost:8080/account/1", strings.NewReader(reqStr))
 	if err != nil {
 		t.Logf(err.Error())
 		t.Fail()
@@ -113,11 +122,11 @@ func TestMain(t *testing.T) {
 	req.Header.Set(Authorization, token.Token)
 
 	response, err = client.Do(req)
-	assertNoError(t, err)
-	assertEqual(t, http.StatusNoContent, response.StatusCode)
+	assert.NilError(t, err)
+	assert.Equal(t, http.StatusNoContent, response.StatusCode)
 
-	// test GET /users, should retrieve latest value
-	req, err = http.NewRequest(echo.GET, Users, strings.NewReader(""))
+	// verify new balance
+	req, err = http.NewRequest(echo.GET, "http://localhost:8080/account/1", strings.NewReader(""))
 	if err != nil {
 		t.Logf(err.Error())
 		t.Fail()
@@ -127,42 +136,56 @@ func TestMain(t *testing.T) {
 	req.Header.Set(Authorization, token.Token)
 
 	response, err = client.Do(req)
-	assertNoError(t, err)
-	assertEqual(t, http.StatusOK, response.StatusCode)
+	assert.NilError(t, err)
+	assert.Equal(t, http.StatusOK, response.StatusCode)
 
 	byteBody, err = ioutil.ReadAll(response.Body)
-	assertNoError(t, err)
-	assertEqual(t, `{"users":[{"email":"test@axiomzen.co","firstName":"NewFirstName","lastName":"NewLastName"}]}`, strings.Trim(string(byteBody), "\n"))
+	assert.NilError(t, err)
 
-	// test GET /users, without token
-	req, err = http.NewRequest(echo.GET, Users, strings.NewReader(""))
+	if error := json.Unmarshal(byteBody, &getAccountByIdResponse); err != nil {
+		panic(error)
+	}
+	assert.DeepEqual(t, getAccountByIdResponse.Account, Account{Id: 1, Balance: 95})
+
+	// test deposit
+	reqStr = `{
+		"type": "deposit",
+		"amount": 10
+	}`
+	req, err = http.NewRequest(echo.POST, "http://localhost:8080/account/1", strings.NewReader(reqStr))
 	if err != nil {
 		t.Logf(err.Error())
 		t.Fail()
 	}
 
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set(Authorization, token.Token)
 
 	response, err = client.Do(req)
-	assertNoError(t, err)
-	assertEqual(t, http.StatusUnauthorized, response.StatusCode)
+	assert.NilError(t, err)
+	assert.Equal(t, http.StatusNoContent, response.StatusCode)
+
+	// verify new balance
+	req, err = http.NewRequest(echo.GET, "http://localhost:8080/account/1", strings.NewReader(""))
+	if err != nil {
+		t.Logf(err.Error())
+		t.Fail()
+	}
+
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set(Authorization, token.Token)
+
+	response, err = client.Do(req)
+	assert.NilError(t, err)
+	assert.Equal(t, http.StatusOK, response.StatusCode)
 
 	byteBody, err = ioutil.ReadAll(response.Body)
-	assertNoError(t, err)
-	assertEqual(t, `{"error":"token error"}`, strings.Trim(string(byteBody), "\n"))
+	assert.NilError(t, err)
+
+	if error := json.Unmarshal(byteBody, &getAccountByIdResponse); err != nil {
+		panic(error)
+	}
+	assert.DeepEqual(t, getAccountByIdResponse.Account, Account{Id: 1, Balance: 105})
 
 	response.Body.Close()
-}
-
-func assertEqual(t *testing.T, a interface{}, b interface{}) {
-	if a != b {
-		t.Fatalf("%s != %s", a, b)
-	}
-}
-
-func assertNoError(t *testing.T, err error) {
-	if err != nil {
-		t.Logf(err.Error())
-		t.Fail()
-	}
 }
